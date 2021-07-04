@@ -1,0 +1,154 @@
+$sel = `ls -sl -fl`;
+
+proc unlockAttr(string $name)
+{
+    CBunlockAttr ($name+".tx");
+    CBunlockAttr ($name+".ty");
+    CBunlockAttr ($name+".tz");
+    CBunlockAttr ($name+".rx");
+    CBunlockAttr ($name+".ry");
+    CBunlockAttr ($name+".rz");
+    CBunlockAttr ($name+".sx");
+    CBunlockAttr ($name+".sy");
+    CBunlockAttr ($name+".sz");
+}
+
+string $rootGrp = `group -n "proxies" -w -em`;
+
+for($mesh in $sel)
+{   
+    print "processing mesh\n";
+
+    string $meshName = $mesh;
+    string $skinClusterName = `findRelatedSkinCluster $meshName`;
+    skinCluster -e -nw 2 $skinClusterName;// convert to post skinning
+    select -r $meshName;
+    int $counts[] = `polyEvaluate -v`;//Get number of vertices
+    int $numVerts = $counts[0];
+    string $infVerts[];
+
+    global string $gMainProgressBar;
+    progressBar  -edit -beginProgress -isInterruptable false -status "Reducing Influences to 1 ..." -maxValue $numVerts $gMainProgressBar;
+
+    string $influences[] = `skinCluster -q -inf`;//Get all Joint influences on a mesh
+
+    int $vertId = 0;
+
+    
+    print "processing vertices\n";
+    for($vertId = 0; $vertId < $numVerts; $vertId++)
+    {
+        float $weights[] = `skinPercent -q -v $skinClusterName ($meshName +".vtx["+$vertId+"]")`; 
+        $tmpData = "";
+        float $weight;
+        int $maxID = 0;
+        float $maxWeight = 0;
+        int $id = 0;
+        for($weight in $weights)
+        {
+            if($weight > $maxWeight)
+            {
+                $maxWeight = $weight;
+                $maxID = $id;
+            }
+            $id++;
+        }
+
+        $infVerts[$maxID] = $infVerts[$maxID] + $vertId + ",";
+
+        $id = 0;
+        string $tmp = "";
+        for($inf in $influences)
+        {
+            if($id == $maxID)
+            {
+                $tmp += " -tv "+$inf+" 1";
+            }
+            else
+            {
+                $tmp += " -tv "+$inf+" 0";
+            }
+            $id++;
+        }
+        string $cmnd = "skinPercent"+$tmp+" "+$skinClusterName+" "+$meshName + ".vtx[" + $vertId + "]";
+        eval ($cmnd); 
+        progressBar -edit -step 1 $gMainProgressBar;  
+    }
+    //kill the progress bar
+    progressBar -edit -endProgress $gMainProgressBar;
+
+    
+    print "processing influences & creating meshes\n";
+
+    int $id = 0;
+    for($infVert in $infVerts)
+    {       
+
+        string $results[];
+        clear $results;
+	    int $ids = tokenize($infVert, ",", $results);
+	    
+        if($ids > 0 && $infVert != "")
+        {
+            string $newMesh[] = `duplicate $meshName`;
+            string $newMeshName = $newMesh[0];
+
+
+            string $finalVerts = "";
+            string $result;
+            for($result in $results)
+            {
+                $finalVerts = $finalVerts + $newMeshName + ".vtx[" + $result + "] ";
+            }
+            
+            
+            select -cl;
+            selectMode -o;
+            select -r $newMeshName;
+            selectMode -co;
+            
+
+            string $cmnd = "select -r " + $finalVerts;
+            eval ($cmnd);
+            
+            //ConvertSelectionToContainedFaces;
+            ConvertSelectionToFaces;
+
+            int $numfaces[] = `polyEvaluate -faceComponent`;
+            if($numfaces[0] > 0)
+            {
+                InvertSelection;
+                doDelete;
+
+                selectMode -o;
+
+                unlockAttr($newMeshName);
+
+                parent $newMeshName $rootGrp;
+
+                select -r $influences[$id];
+                select -tgl $newMeshName;
+                doCreateParentConstraintArgList 1 { "1","0","0","0","0","0","0","0","1","","1" };
+                parentConstraint -mo -weight 1;
+                doCreateScaleConstraintArgList 1 { "1","1","1","1","0","0","0","1","","1" };
+                scaleConstraint -mo -weight 1;
+            }
+            else
+            {
+                selectMode -o;
+                select -r $newMeshName;
+                doDelete;
+            }
+        }
+
+        $id++;
+    }
+
+    
+    setAttr ($meshName+".visibility") 0;
+
+}
+
+selectMode -o;
+print "Skinning load reduced";
+

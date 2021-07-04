@@ -1,0 +1,57 @@
+
+$sel = `ls -sl -fl`;
+string $meshName = $sel[0];
+string $skinClusterName = `findRelatedSkinCluster $meshName`;
+skinCluster -e -nw 2 $skinClusterName;// convert to post skinning
+select -r $meshName;
+int $counts[] = `polyEvaluate -v`;//Get number of vertices
+int $numVerts = $counts[0];
+
+global string $gMainProgressBar;
+progressBar  -edit -beginProgress -isInterruptable false -status "Reducing Influences to 1 ..." -maxValue $numVerts $gMainProgressBar;
+
+string $influences[] = `skinCluster -q -inf`;//Get all Joint influences on a mesh
+
+int $vertId = 0;
+for($vertId = 0; $vertId < $numVerts; $vertId++)
+{
+    float $weights[] = `skinPercent -q -v $skinClusterName ($meshName +".vtx["+$vertId+"]")`; 
+    $tmpData = "";
+    float $weight;
+    int $maxID = 0;
+    float $maxWeight = 0;
+    int $id = 0;
+    for($weight in $weights)
+    {
+        if($weight > $maxWeight)
+        {
+            $maxWeight = $weight;
+            $maxID = $id;
+        }
+        $id++;
+    }
+
+    $id = 0;
+    string $tmp = "";
+    for($inf in $influences)
+    {
+        if($id == $maxID)
+        {
+            $tmp += " -tv "+$inf+" 1";
+        }
+        else
+        {
+            $tmp += " -tv "+$inf+" 0";
+        }
+        $id++;
+    }
+    string $cmnd = "skinPercent"+$tmp+" "+$skinClusterName+" "+$meshName + ".vtx[" + $vertId + "]";
+    eval ($cmnd); 
+    progressBar -edit -step 1 $gMainProgressBar;  
+}
+
+
+print "Skinning load reduced";
+
+//kill the progress bar
+progressBar -edit -endProgress $gMainProgressBar;
