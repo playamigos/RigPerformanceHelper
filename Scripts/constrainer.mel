@@ -1,16 +1,46 @@
-$sel = `ls -sl -fl`;
+$sel = `ls -sl -fl -l`;
 
 proc unlockAttr(string $name)
 {
-    CBunlockAttr ($name+".tx");
-    CBunlockAttr ($name+".ty");
-    CBunlockAttr ($name+".tz");
-    CBunlockAttr ($name+".rx");
-    CBunlockAttr ($name+".ry");
-    CBunlockAttr ($name+".rz");
-    CBunlockAttr ($name+".sx");
-    CBunlockAttr ($name+".sy");
-    CBunlockAttr ($name+".sz");
+    lockNode -lock 0 $name;
+    string $lockedPlug;
+
+    $lockedPlug = `connectionInfo -gla ($name+".tx")`;
+    if ( $lockedPlug != "" ){
+        setAttr -lock false $lockedPlug;
+    }
+    $lockedPlug = `connectionInfo -gla ($name+".ty")`;
+    if ( $lockedPlug != "" ){
+        setAttr -lock false $lockedPlug;
+    }
+    $lockedPlug = `connectionInfo -gla ($name+".tz")`;
+    if ( $lockedPlug != "" ){
+        setAttr -lock false $lockedPlug;
+    }
+    $lockedPlug = `connectionInfo -gla ($name+".rx")`;
+    if ( $lockedPlug != "" ){
+        setAttr -lock false $lockedPlug;
+    }
+    $lockedPlug = `connectionInfo -gla ($name+".ry")`;
+    if ( $lockedPlug != "" ){
+        setAttr -lock false $lockedPlug;
+    }
+    $lockedPlug = `connectionInfo -gla ($name+".rz")`;
+    if ( $lockedPlug != "" ){
+        setAttr -lock false $lockedPlug;
+    }
+    $lockedPlug = `connectionInfo -gla ($name+".sx")`;
+    if ( $lockedPlug != "" ){
+        setAttr -lock false $lockedPlug;
+    }
+    $lockedPlug = `connectionInfo -gla ($name+".sy")`;
+    if ( $lockedPlug != "" ){
+        setAttr -lock false $lockedPlug;
+    }
+    $lockedPlug = `connectionInfo -gla ($name+".sz")`;
+    if ( $lockedPlug != "" ){
+        setAttr -lock false $lockedPlug;
+    }
 }
 
 string $rootGrp = `group -n "proxies" -w -em`;
@@ -90,7 +120,7 @@ for($mesh in $sel)
 	    
         if($ids > 0 && $infVert != "")
         {
-            string $newMesh[] = `duplicate $meshName`;
+            string $newMesh[] = `duplicate -n "ProxyMesh" $meshName`;
             string $newMeshName = $newMesh[0];
 
 
@@ -111,8 +141,8 @@ for($mesh in $sel)
             string $cmnd = "select -r " + $finalVerts;
             eval ($cmnd);
             
-            //ConvertSelectionToContainedFaces;
-            ConvertSelectionToFaces;
+            ConvertSelectionToContainedFaces;
+            //ConvertSelectionToFaces;
 
             int $numfaces[] = `polyEvaluate -faceComponent`;
             if($numfaces[0] > 0)
@@ -122,6 +152,8 @@ for($mesh in $sel)
 
                 selectMode -o;
 
+                unlockAttr($newMeshName);
+                unlockAttr($newMeshName);
                 unlockAttr($newMeshName);
 
                 parent $newMeshName $rootGrp;
@@ -145,7 +177,9 @@ for($mesh in $sel)
     }
 
     
-    setAttr ($meshName+".visibility") 0;
+    // setAttr ($meshName+".visibility") 0;
+    skinCluster -e  -ub $meshName;
+    delete $meshName;
 
 }
 
